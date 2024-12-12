@@ -60,16 +60,16 @@ To make changes persistent:
 
 Install the Linux kernel headers
 
-	`sudo apt install raspberrypi-kernel-headers`
+	sudo apt install raspberrypi-kernel-headers
 
 Build, install, and enable the kernel module:
 
-    `make`
-    `sudo make install`
+    make
+    sudo make install
 
 To remove:
 
-    `sudo make uninstall`
+    sudo make uninstall
 
 [Original fbdev module readme with pinouts and build instructions](https://github.com/w4ilun/Sharp-Memory-LCD-Kernel-Driver/blob/master/README.md)
 
