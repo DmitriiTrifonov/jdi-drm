@@ -41,7 +41,11 @@
 #include "drm_iface.h"
 
 // JDI single line
-#define CMD_WRITE_LINE 0b10001000
+// #define CMD_WRITE_LINE 0b10001000
+
+// JDI 4-bit single line
+#define CMD_WRITE_LINE = 0b10010000
+
 
 // Sharp single line
 // #define CMD_WRITE_LINE 0b10000000
@@ -141,7 +145,7 @@ static int sharp_memory_spi_write_tagged_lines(struct sharp_memory_panel *panel,
 	int rc;
 
 	// Write line command
-	panel->cmd_buf[0] = 0b10001000;
+	panel->cmd_buf[0] = CMD_WRITE_LINE;
 	panel->spi_3_xfers[0].tx_buf = panel->cmd_buf;
 	panel->spi_3_xfers[0].len = 1;
 
