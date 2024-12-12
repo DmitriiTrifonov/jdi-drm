@@ -40,7 +40,11 @@
 #include "ioctl_iface.h"
 #include "drm_iface.h"
 
-#define CMD_WRITE_LINE 0b10000000
+// JDI single line
+#define CMD_WRITE_LINE 0b10001000
+
+// Sharp single line
+// #define CMD_WRITE_LINE 0b10000000
 #define CMD_CLEAR_SCREEN 0b00100000
 
 // Globals
@@ -124,9 +128,10 @@ static int sharp_memory_spi_clear_screen(struct sharp_memory_panel *panel)
 
 static inline u8 sharp_memory_reverse_byte(u8 b)
 {
-	b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
-	b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
-	b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
+	// Disable for JDI display
+	// b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
+	// b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
+	// b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
 	return b;
 }
 

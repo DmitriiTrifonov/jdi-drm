@@ -1,11 +1,18 @@
 ---
-title: Sharp DRM Driver
+title: JDI DRM Driver
 layout: default
 ---
 
-# Sharp Memory LCD Kernel Driver
+# JDI Memory LCD Kernel Driver
 
-DRM kernel driver for 2.7" 400x240 Sharp memory LCD panel.
+DRM kernel driver for 2.7" 400x240 JDI LCD panel.
+
+## Based on
+- https://github.com/ardangelo/sharp-drm-driver
+- https://github.com/TheMediocritist/jdi-drm-driver
+- https://github.com/prokrypt/sharp-drm-driver
+- https://github.com/hyphenlee/jdi-drm-rpi
+- https://github.com/a8ksh4/jdi-drm-driver
 
 ## User Guide
 
@@ -53,16 +60,16 @@ To make changes persistent:
 
 Install the Linux kernel headers
 
-	sudo apt-get install raspberrypi-kernel-headers
+	`sudo apt install raspberrypi-kernel-headers`
 
 Build, install, and enable the kernel module:
 
-    make
-    sudo make install
+    `make`
+    `sudo make install`
 
 To remove:
 
-    sudo make uninstall
+    `sudo make uninstall`
 
 [Original fbdev module readme with pinouts and build instructions](https://github.com/w4ilun/Sharp-Memory-LCD-Kernel-Driver/blob/master/README.md)
 

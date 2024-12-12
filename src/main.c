@@ -59,9 +59,9 @@ static struct spi_driver sharp_memory_spi_driver = {
 };
 module_spi_driver(sharp_memory_spi_driver);
 
-MODULE_VERSION("1.5");
-MODULE_DESCRIPTION("Sharp Memory LCD DRM driver");
-MODULE_AUTHOR("Andrew D'Angelo");
+MODULE_VERSION("0.1");
+MODULE_DESCRIPTION("JDI LCD DRM driver");
+MODULE_AUTHOR("Dmitrii Trifonov");
 MODULE_LICENSE("GPL");
 
 void sharp_memory_set_invert(int setting)
