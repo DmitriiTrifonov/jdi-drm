@@ -282,6 +282,35 @@ static size_t jdi_memory_rgb8_to_3bit_tagged(u8 *buf, int width, int height, int
 			// Build up the destination mono byte
 			for (b1 = 0; b1 < 8; b1++) {
 
+				/*
+				
+				// Extract the red, green, and blue values for the current pixel
+                    r = (p & 0x07) * 36;                // Bit 0-2 for red (0-7 scaled to 0-252)
+                    g = ((p & 0x38) >> 3) * 36;         // Bit 3-5 for green (0-7 scaled to 0-252)
+                    b = ((p & 0xC0) >> 6) * 85;         // Bit 6-7 for blue (0-3 scaled to 0-255)
+                    
+                    // convert to 1 bit
+                    r = r >= 126 ? 1 : 0;
+                    g = g >= 126 ? 1 : 0;
+                    b = b >= 128 ? 1 : 0;
+                    
+                    // index bytes
+                    rByte = (x*3)/8;
+                    gByte = (x*3+1)/8;
+                    bByte = (x*3+2)/8;
+                    
+                    //index bits
+                    rBit = (x*3) % 8;
+                    gBit = (x*3+1) % 8;
+                    bBit = (x*3+2) % 8;
+                    
+                    // Pack the red, green, and blue bits into the c byte array
+                    c[rByte] |= (r << (rBit));  // Pack red bit
+                    c[gByte] |= (g << (gBit));  // Pack green bit
+                    c[bByte] |= (b << (bBit));  // Pack blue bit   
+				
+				*/
+
 				// // Change at what gray level the mono pixel is active here
 				// if (buf[(line * width) + b8 + b1] >= g_param_mono_cutoff) {
 				// 	d |= 0b10000000 >> b1;
