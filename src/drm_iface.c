@@ -40,11 +40,11 @@
 #include "ioctl_iface.h"
 #include "drm_iface.h"
 
-// JDI single line
-// #define CMD_WRITE_LINE 0b10001000
+// JDI 1-bit single line
+#define CMD_WRITE_LINE 0b10001000
 
 // JDI 3-bit single line
-#define CMD_WRITE_LINE 0b10000000
+// #define CMD_WRITE_LINE 0b10000000
 
 // JDI 4-bit single line
 // #define CMD_WRITE_LINE 0b10010000
@@ -367,6 +367,8 @@ static int jdi_memory_clip_3bit_tagged(struct sharp_memory_panel* panel, size_t*
 	// DMA `clip` into `buf` and convert to rgb888
 	drm_fb_xrgb8888_to_rgb888(&dst, NULL, &vmap, fb, clip);
 
+	printk(KERN_INFO "DST size: %d\n", sizeof(dst));
+
 	// End DMA area
 	drm_gem_fb_end_cpu_access(fb, DMA_FROM_DEVICE);
 
@@ -378,7 +380,11 @@ static int jdi_memory_clip_3bit_tagged(struct sharp_memory_panel* panel, size_t*
 	}
 
 	// Convert in-place from 8-bit to 3-bit
-	*result_len = jdi_memory_rgb8_to_3bit_tagged(buf,
+	// *result_len = jdi_memory_rgb8_to_3bit_tagged(buf,
+	// 	(clip->x2 - clip->x1), (clip->y2 - clip->y1), clip->y1);
+
+	// Convert in-place from 8-bit to 1-bit
+	*result_len = sharp_memory_gray8_to_mono_tagged(buf,
 		(clip->x2 - clip->x1), (clip->y2 - clip->y1), clip->y1);
 
 	// Success
