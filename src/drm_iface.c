@@ -349,7 +349,7 @@ static int jdi_memory_clip_3bit_tagged(struct sharp_memory_panel* panel, size_t*
 	}
 
 	// Convert in-place from 8-bit to 3-bit
-	*result_len = jdi_memory_clip_3bit_tagged(buf,
+	*result_len = jdi_memory_rgb8_to_3bit_tagged(buf,
 		(clip->x2 - clip->x1), (clip->y2 - clip->y1), clip->y1);
 
 	// Success
@@ -394,10 +394,7 @@ static int sharp_memory_clip_mono_tagged(struct sharp_memory_panel* panel, size_
 	}
 
 	// Convert in-place from 8-bit grayscale to mono
-	// *result_len = sharp_memory_gray8_to_mono_tagged(buf,
-	// 	(clip->x2 - clip->x1), (clip->y2 - clip->y1), clip->y1);
-
-	*result_len = jdi_memory_rgb8_to_3bit_tagged(buf,
+	*result_len = sharp_memory_gray8_to_mono_tagged(buf,
 		(clip->x2 - clip->x1), (clip->y2 - clip->y1), clip->y1);
 
 	// Success
@@ -427,8 +424,10 @@ static int sharp_memory_fb_dirty(struct drm_framebuffer *fb,
 		return -ENODEV;
 	}
 
-	// Convert `clip` from framebuffer to mono with line number tags
-	rc = sharp_memory_clip_mono_tagged(panel, &buf_len, panel->buf, fb, &clip);
+	// // Convert `clip` from framebuffer to mono with line number tags
+	// rc = sharp_memory_clip_mono_tagged(panel, &buf_len, panel->buf, fb, &clip);
+
+	rc = jdi_memory_clip_3bit_tagged(panel, &buf_len, panel->buf, fb, &clip);
 	if (rc) {
 		goto out_exit;
 	}
