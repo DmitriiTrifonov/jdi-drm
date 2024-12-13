@@ -43,8 +43,11 @@
 // JDI single line
 // #define CMD_WRITE_LINE 0b10001000
 
+// JDI 3-bit single line
+#define CMD_WRITE_LINE 0b10000000
+
 // JDI 4-bit single line
-#define CMD_WRITE_LINE = 0b10010000
+// #define CMD_WRITE_LINE 0b10010000
 
 
 // Sharp single line
@@ -261,6 +264,98 @@ static size_t sharp_memory_gray8_to_mono_tagged(u8 *buf, int width, int height, 
 	return height * tagged_line_len;
 }
 
+static size_t jdi_memory_rgb8_to_3bit_tagged(u8 *buf, int width, int height, int y0)
+{
+	int line, b8, b1;
+	unsigned char d;
+	int const tagged_line_len = 2 + width / 8;
+
+	// Iterate over lines from [0, height)
+	for (line = 0; line < height; line++) {
+
+		// Iterate over chunks of 8 source grayscale bytes
+		// Each 8-byte source chunk will map to one destination mono byte
+		for (b8 = 0; b8 < width; b8 += 8) {
+			d = 0;
+
+			// Iterate over each of the 8 grayscale bytes in the chunk
+			// Build up the destination mono byte
+			for (b1 = 0; b1 < 8; b1++) {
+
+				// // Change at what gray level the mono pixel is active here
+				// if (buf[(line * width) + b8 + b1] >= g_param_mono_cutoff) {
+				// 	d |= 0b10000000 >> b1;
+				// }
+			}
+
+			// Apply inversion
+			if (g_param_mono_invert) {
+				d = ~d;
+			}
+
+			// Without the line number and trailer tags, each destination
+			// mono line would have a length `width / 8`. However, we are
+			// inserting the line number at the beginning of the line and
+			// the zero-byte trailer at the end.
+			// So the destination mono line is at index
+			// `line * tagged_line_len = line * (2 + width / 8)`
+			// The destination mono byte is offset by 1 to make room for
+			// the line tag, written at the end of converting the current
+			// line.
+			buf[(line * tagged_line_len) + 1 + (b8 / 8)] = d;
+		}
+
+		// Write the line number and trailer tags
+		buf[line * tagged_line_len] = sharp_memory_reverse_byte((u8)(y0 + 1)); // Indexed from 1
+		buf[(line * tagged_line_len) + tagged_line_len - 1] = 0;
+		y0++;
+	}
+
+	return height * tagged_line_len;
+}
+
+// Use DMA to make 3-bit colors image
+static int jdi_memory_clip_3bit_tagged(struct sharp_memory_panel* panel, size_t* result_len,
+	u8* buf, struct drm_framebuffer *fb, struct drm_rect const* clip) 
+{
+	int rc;
+	struct drm_gem_dma_object *dma_obj;
+	struct iosys_map dst, vmap;
+
+	// Get GEM memory manager
+	dma_obj = drm_fb_dma_get_gem_obj(fb, 0);
+
+	// Start DMA area
+	rc = drm_gem_fb_begin_cpu_access(fb, DMA_FROM_DEVICE);
+	if (rc) {
+		return rc;
+	}
+
+	// Initialize destination (buf) and source (video)
+	iosys_map_set_vaddr(&dst, buf);
+	iosys_map_set_vaddr(&vmap, dma_obj->vaddr);
+
+	// DMA `clip` into `buf` and convert to rgb888
+	drm_fb_xrgb8888_to_rgb888(&dst, NULL, &vmap, fb, clip);
+
+	// End DMA area
+	drm_gem_fb_end_cpu_access(fb, DMA_FROM_DEVICE);
+
+	// Add overlays
+	if (g_param_overlays) {
+
+		// TODO: track overlay draw region
+		draw_overlays(panel, buf, fb->width, clip);
+	}
+
+	// Convert in-place from 8-bit to 3-bit
+	*result_len = jdi_memory_clip_3bit_tagged(buf,
+		(clip->x2 - clip->x1), (clip->y2 - clip->y1), clip->y1);
+
+	// Success
+	return 0;
+}
+
 // Use DMA to get grayscale representation, then convert to mono
 // with line number and trailer tags suitable for multi-line write
 // Output is stored in `buf`, which must be at least W*H bytes
@@ -283,7 +378,9 @@ static int sharp_memory_clip_mono_tagged(struct sharp_memory_panel* panel, size_
 	// Initialize destination (buf) and source (video)
 	iosys_map_set_vaddr(&dst, buf);
 	iosys_map_set_vaddr(&vmap, dma_obj->vaddr);
-	// DMA `clip` into `buf` and convert to 8-bit grayscale
+
+	// Commented due to not using 1-bit image
+	// // DMA `clip` into `buf` and convert to 8-bit grayscale
 	drm_fb_xrgb8888_to_gray8(&dst, NULL, &vmap, fb, clip);
 
 	// End DMA area
@@ -297,7 +394,10 @@ static int sharp_memory_clip_mono_tagged(struct sharp_memory_panel* panel, size_
 	}
 
 	// Convert in-place from 8-bit grayscale to mono
-	*result_len = sharp_memory_gray8_to_mono_tagged(buf,
+	// *result_len = sharp_memory_gray8_to_mono_tagged(buf,
+	// 	(clip->x2 - clip->x1), (clip->y2 - clip->y1), clip->y1);
+
+	*result_len = jdi_memory_rgb8_to_3bit_tagged(buf,
 		(clip->x2 - clip->x1), (clip->y2 - clip->y1), clip->y1);
 
 	// Success
