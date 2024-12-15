@@ -272,7 +272,7 @@ static size_t jdi_memory_fill_one_color(u8 *buf, int width, int height, int y0)
 
 	for (line = 0; line < height; line++) {
 		for (b8 = 0; b8 < width; b8 += 8) {
-			d = 0b10101010;
+			d = 0b00000101;
 
 			if (g_param_mono_invert) {
 				d = ~d;
