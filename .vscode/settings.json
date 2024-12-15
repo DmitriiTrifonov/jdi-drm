@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "ioctl_iface.h": "c",
+        "drm_iface.h": "c"
+    }
+}

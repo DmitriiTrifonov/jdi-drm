@@ -264,31 +264,7 @@ static size_t sharp_memory_gray8_to_mono_tagged(u8 *buf, int width, int height, 
 	return height * tagged_line_len;
 }
 
-static size_t jdi_memory_fill_one_color(u8 *buf, int width, int height, int y0)
-{
-	int line, b8, b1;
-	unsigned char d;
-	int const tagged_line_len = 2 + width / 8;
-
-	for (line = 0; line < height; line++) {
-		for (b8 = 0; b8 < width; b8 += 8) {
-			d = 0b00000101;
-
-			if (g_param_mono_invert) {
-				d = ~d;
-			}
-
-			buf[(line * tagged_line_len) + 1 + (b8 / 8)] = d;
-		}
-		buf[line * tagged_line_len] = sharp_memory_reverse_byte((u8)(y0 + 1)); // Indexed from 1
-		buf[(line * tagged_line_len) + tagged_line_len - 1] = 0;
-		y0++;
-	}
-
-	return height * tagged_line_len;
-}
-
-static size_t jdi_memory_rgb8_to_3bit_tagged(u8 *buf, int width, int height, int y0)
+static size_t jdi_memory_rgb888_to_3bit_tagged(u8 *buf, int width, int height, int y0)
 {
 	int line, b8, b1;
 	unsigned char d;
@@ -404,12 +380,8 @@ static int jdi_memory_clip_3bit_tagged(struct sharp_memory_panel* panel, size_t*
 	}
 
 	// Convert in-place from 8-bit to 3-bit
-	*result_len = jdi_memory_fill_one_color(buf,
+	*result_len = jdi_memory_rgb888_to_3bit_tagged(buf,
 		(clip->x2 - clip->x1), (clip->y2 - clip->y1), clip->y1);
-
-	// // Convert in-place from 8-bit to 1-bit
-	// *result_len = sharp_memory_gray8_to_mono_tagged(buf,
-	// 	(clip->x2 - clip->x1), (clip->y2 - clip->y1), clip->y1);
 
 	// Success
 	return 0;
