@@ -40,11 +40,11 @@
 #include "ioctl_iface.h"
 #include "drm_iface.h"
 
-// JDI single line
-#define CMD_WRITE_LINE 0b10001000
+// JDI single line 1 bit
+// #define CMD_WRITE_LINE 0b10001000
 
-// Sharp single line
-// #define CMD_WRITE_LINE 0b10000000
+// JDI single line 3 bit
+#define CMD_WRITE_LINE 0b10000000
 #define CMD_CLEAR_SCREEN 0b00100000
 
 // Globals
@@ -279,8 +279,19 @@ static int sharp_memory_clip_mono_tagged(struct sharp_memory_panel* panel, size_
 	// Initialize destination (buf) and source (video)
 	iosys_map_set_vaddr(&dst, buf);
 	iosys_map_set_vaddr(&vmap, dma_obj->vaddr);
+
+	
 	// DMA `clip` into `buf` and convert to 8-bit grayscale
-	drm_fb_xrgb8888_to_gray8(&dst, NULL, &vmap, fb, clip);
+	// Use it for 1 bit mode
+	//drm_fb_xrgb8888_to_gray8(&dst, NULL, &vmap, fb, clip);
+
+	// TODO: Switch here to drm_fb_xrgb8888_to_rgb888 usage 
+	// Compare signatures and buffer size
+	// https://docs.kernel.org/gpu/drm-kms-helpers.html
+	// void drm_fb_xrgb8888_to_mono(struct iosys_map *dst, const unsigned int *dst_pitch, const struct iosys_map *src, const struct drm_framebuffer *fb, const struct drm_rect *clip, struct drm_format_conv_state *state)
+	// void drm_fb_xrgb8888_to_rgb888(struct iosys_map *dst, const unsigned int *dst_pitch, const struct iosys_map *src, const struct drm_framebuffer *fb, const struct drm_rect *clip, struct drm_format_conv_state *state)
+
+	drm_fb_xrgb8888_to_rgb888(&dst, NULL, &vmap, fb, clip);
 
 	// End DMA area
 	drm_gem_fb_end_cpu_access(fb, DMA_FROM_DEVICE);
