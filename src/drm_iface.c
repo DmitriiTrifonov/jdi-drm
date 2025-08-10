@@ -46,6 +46,7 @@
 // JDI single line 3 bit
 #define CMD_WRITE_LINE 0b10000000
 #define CMD_CLEAR_SCREEN 0b00100000
+#define COLOR_MODE_BITS 3
 
 // Globals
 
@@ -141,7 +142,7 @@ static int sharp_memory_spi_write_tagged_lines(struct sharp_memory_panel *panel,
 	int rc;
 
 	// Write line command
-	panel->cmd_buf[0] = 0b10001000;
+	panel->cmd_buf[0] = CMD_WRITE_LINE;
 	panel->spi_3_xfers[0].tx_buf = panel->cmd_buf;
 	panel->spi_3_xfers[0].len = 1;
 
@@ -211,11 +212,66 @@ static size_t sharp_memory_gray8_to_mono_tagged(u8 *buf, int width, int height, 
 {
 	int line, b8, b1;
 	unsigned char d;
+
+	// TODO: Change line len to 3bit-mode
 	int const tagged_line_len = 2 + width / 8;
 
 	// Iterate over lines from [0, height)
 	for (line = 0; line < height; line++) {
 
+		// Iterate over chunks of 8 source grayscale bytes
+		// Each 8-byte source chunk will map to one destination mono byte
+		for (b8 = 0; b8 < width; b8 += 8) {
+			d = 0;
+
+			// Iterate over each of the 8 grayscale bytes in the chunk
+			// Build up the destination mono byte
+			for (b1 = 0; b1 < 8; b1++) {
+
+				// Change at what gray level the mono pixel is active here
+				if (buf[(line * width) + b8 + b1] >= g_param_mono_cutoff) {
+					d |= 0b10000000 >> b1;
+				}
+			}
+
+			// Apply inversion
+			if (g_param_mono_invert) {
+				d = ~d;
+			}
+
+			// Without the line number and trailer tags, each destination
+			// mono line would have a length `width / 8`. However, we are
+			// inserting the line number at the beginning of the line and
+			// the zero-byte trailer at the end.
+			// So the destination mono line is at index
+			// `line * tagged_line_len = line * (2 + width / 8)`
+			// The destination mono byte is offset by 1 to make room for
+			// the line tag, written at the end of converting the current
+			// line.
+			buf[(line * tagged_line_len) + 1 + (b8 / 8)] = d;
+		}
+
+		// Write the line number and trailer tags
+		buf[line * tagged_line_len] = sharp_memory_reverse_byte((u8)(y0 + 1)); // Indexed from 1
+		buf[(line * tagged_line_len) + tagged_line_len - 1] = 0;
+		y0++;
+	}
+
+	return height * tagged_line_len;
+}
+
+static size_t sharp_memory_rgb888_to_rgb111_tagged(u8 *buf, int width, int height, int y0)
+{
+	int line, b8, b1;
+	unsigned char d;
+
+	
+	int const tagged_line_len = 2 + width * COLOR_MODE_BITS / 8;
+
+	// Iterate over lines from [0, height)
+	for (line = 0; line < height; line++) {
+
+		
 		// Iterate over chunks of 8 source grayscale bytes
 		// Each 8-byte source chunk will map to one destination mono byte
 		for (b8 = 0; b8 < width; b8 += 8) {
@@ -280,18 +336,11 @@ static int sharp_memory_clip_mono_tagged(struct sharp_memory_panel* panel, size_
 	iosys_map_set_vaddr(&dst, buf);
 	iosys_map_set_vaddr(&vmap, dma_obj->vaddr);
 
-	
+
 	// DMA `clip` into `buf` and convert to 8-bit grayscale
 	// Use it for 1 bit mode
-	//drm_fb_xrgb8888_to_gray8(&dst, NULL, &vmap, fb, clip);
+	drm_fb_xrgb8888_to_gray8(&dst, NULL, &vmap, fb, clip);
 
-	// TODO: Switch here to drm_fb_xrgb8888_to_rgb888 usage 
-	// Compare signatures and buffer size
-	// https://docs.kernel.org/gpu/drm-kms-helpers.html
-	// void drm_fb_xrgb8888_to_mono(struct iosys_map *dst, const unsigned int *dst_pitch, const struct iosys_map *src, const struct drm_framebuffer *fb, const struct drm_rect *clip, struct drm_format_conv_state *state)
-	// void drm_fb_xrgb8888_to_rgb888(struct iosys_map *dst, const unsigned int *dst_pitch, const struct iosys_map *src, const struct drm_framebuffer *fb, const struct drm_rect *clip, struct drm_format_conv_state *state)
-
-	drm_fb_xrgb8888_to_rgb888(&dst, NULL, &vmap, fb, clip);
 
 	// End DMA area
 	drm_gem_fb_end_cpu_access(fb, DMA_FROM_DEVICE);
@@ -311,6 +360,85 @@ static int sharp_memory_clip_mono_tagged(struct sharp_memory_panel* panel, size_
 	return 0;
 }
 
+// Use DMA to get XRGB888, then convert to RGB111
+static int jdi_memory_clip_rgb111_tagged(struct sharp_memory_panel* panel, size_t* result_len,
+	u8* buf, struct drm_framebuffer *fb, struct drm_rect const* clip)
+{
+	int rc;
+	struct drm_gem_dma_object *dma_obj;
+	struct iosys_map vmap;
+	const int width  = clip->x2 - clip->x1;
+	const int height = clip->y2 - clip->y1;
+
+	// Get GEM memory manager
+	dma_obj = drm_fb_dma_get_gem_obj(fb, 0);
+
+	// Start DMA area
+	rc = drm_gem_fb_begin_cpu_access(fb, DMA_FROM_DEVICE);
+	if (rc) {
+		return rc;
+	}
+
+	// Initialize source (video)
+	iosys_map_set_vaddr(&vmap, dma_obj->vaddr);
+
+	// Per line: 1 (line tag) + packed RGB111 + 1 (line trailer)
+	// width=400 -> 400*3/8 = 150 packed bytes; no extra padding needed
+	const int tagged_line_len = 2 + (width * COLOR_MODE_BITS / 8);
+
+	// Convert XRGB8888 → packed RGB111 directly into 'buf'
+	for (int line = 0; line < height; line++) {
+		const int y = clip->y1 + line;
+		const u32 *src_line = (const u32 *)((u8 *)vmap.vaddr + y * fb->pitches[0]);
+		u8 *dst_line = buf + line * tagged_line_len;
+
+		// (1) Line number tag (indexed from 1), MSB-first per panel expectations
+		dst_line[0] = sharp_memory_reverse_byte((u8)(y + 1));
+
+		// (2) Pack pixels: 3 bits per pixel (R,G,B), MSB-first in the bitstream
+		int bit_pos = 0;     // number of valid bits currently in byte_acc
+		u8  byte_acc = 0;
+		int out_idx  = 1;    // index in dst_line for packed bytes
+
+		for (int x = 0; x < width; x++) {
+			u32 px = src_line[x];       // XRGB8888: X RRRRRRRR GGGGGGGG BBBBBBBB
+			u8 r1 = (px >> 23) & 0x1;   // R MSB
+			u8 g1 = (px >> 15) & 0x1;   // G MSB
+			u8 b1 = (px >>  7) & 0x1;   // B MSB
+			u8 rgb111 = (r1 << 2) | (g1 << 1) | b1;
+
+			byte_acc = (u8)((byte_acc << COLOR_MODE_BITS) | rgb111);
+			bit_pos += COLOR_MODE_BITS;
+
+			if (bit_pos >= 8) {
+				dst_line[out_idx++] = byte_acc;
+				bit_pos -= 8;
+				if (bit_pos > 0) {
+					// carry remaining upper bits of rgb111 to next byte
+					byte_acc = (u8)(rgb111 & ((1 << bit_pos) - 1));
+				} else {
+					byte_acc = 0;
+				}
+			}
+		}
+
+		// Flush any remaining bits (left-align to MSB in the last byte)
+		if (bit_pos > 0) {
+			byte_acc <<= (8 - bit_pos);
+			dst_line[out_idx++] = byte_acc;
+		}
+
+		// (3) Line trailer byte required by single-line write protocol
+		dst_line[tagged_line_len - 1] = 0x00;
+	}
+
+	// End DMA area
+	drm_gem_fb_end_cpu_access(fb, DMA_FROM_DEVICE);
+
+	*result_len = (size_t)height * tagged_line_len;
+	return 0;
+}
+
 static int sharp_memory_fb_dirty(struct drm_framebuffer *fb,
 	struct drm_rect const* dirty_rect)
 {
@@ -327,6 +455,8 @@ static int sharp_memory_fb_dirty(struct drm_framebuffer *fb,
 	clip.y2 = dirty_rect->y2;
 
 	// Get panel info from DRM struct
+	// Initialize buffer
+
 	panel = drm_to_panel(fb->dev);
 
 	// Enter DRM device resource area
@@ -334,8 +464,9 @@ static int sharp_memory_fb_dirty(struct drm_framebuffer *fb,
 		return -ENODEV;
 	}
 
-	// Convert `clip` from framebuffer to mono with line number tags
-	rc = sharp_memory_clip_mono_tagged(panel, &buf_len, panel->buf, fb, &clip);
+	// Convert `clip` from framebuffer to rgb111 with line number tags
+	// Remade from mono conversion
+	rc = jdi_memory_clip_rgb111_tagged(panel, &buf_len, panel->buf, fb, &clip);
 	if (rc) {
 		goto out_exit;
 	}
@@ -574,12 +705,18 @@ int drm_probe(struct spi_device *spi)
 	panel->height = mode->vdisplay;
 
 	// Allocate reused heap buffers suitable for SPI source
-	panel->buf = devm_kzalloc(dev, panel->width * panel->height, GFP_KERNEL);
+	// Buffer for the whole screen (or any clip up to full height):
+	// per line: 1 (line tag) + (width * 3 / 8) + 1 (line trailer)
+	// full: height * (2 + width*3/8) = 240 * (2 + 150) = 36,480 bytes for 400x240
+	panel->buf = devm_kzalloc(dev,
+			  panel->height * (2 + (panel->width * COLOR_MODE_BITS / 8)),
+			  GFP_KERNEL);
 	panel->spi_3_xfers = devm_kzalloc(dev, sizeof(struct spi_transfer) * 3, GFP_KERNEL);
 	panel->cmd_buf = devm_kzalloc(dev, 1, GFP_KERNEL);
 	panel->trailer_buf = devm_kzalloc(dev, 1, GFP_KERNEL);
 
 	// DRM mode settings
+	// TODO: Make sure that this will be correct for rgb111
 	drm->mode_config.min_width = mode->hdisplay;
 	drm->mode_config.max_width = mode->hdisplay;
 	drm->mode_config.min_height = mode->vdisplay;
