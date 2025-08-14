@@ -8,3 +8,4 @@
 *.symvers
 *.d
 *.d.*
+.DS_Store
