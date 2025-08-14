@@ -24,7 +24,7 @@ This module automatically adds contents to the Raspberry Pi `/boot/firmware/cmdl
 
 The option `fbcon=font:VGA8x8` configures default font to a smaller size, resulting in dimensions of 30 rows and 50 columns. Can be changed to `font:VGA8x16` for a larger font. More fonts and options for the `fbcon` module can be found at https://www.kernel.org/doc/Documentation/fb/fbcon.txt
 
-### `monoset` Utility
+### `monoset` Utility (Do nothing right now)
 
 The `monoset` script in this repo is a helper to tune the monochrome cutoff for an application. It is installed by default on Beepy Raspbian. If an application has problems with monochrome color, you can run
 
@@ -38,7 +38,7 @@ For example, the `nmtui` utility works best with a cutoff of `127`. In the defau
 
 This will automatically apply a cutoff of 127 when `nmtui` is started from the shell. You can add your own aliases to your profile at `~/.profile`.
 
-### Module Parameters
+### Module Parameters (
 
 Several options are exposed in the directory `/sys/module/sharp_drm/parameters/`. Run
 
@@ -64,7 +64,7 @@ Install the Linux kernel headers
 
 Build, install, and enable the kernel module:
 
-    make
+    sudo make
     sudo make install
 
 To remove:
@@ -79,6 +79,6 @@ Original SPI and GPIO kernel driver at:
 
 	https://github.com/w4ilun/Sharp-Memory-LCD-Kernel-Driver
 
-Sharp datasheet:
+JDI datasheet:
 
-	https://www.sharpsde.com/fileadmin/products/Displays/2016_SDE_App_Note_for_Memory_LCD_programming_V1.3.pdf
+	[Google Drive](https://drive.google.com/file/d/1fVEHQPATANvmmXb0ax6Sr_F0cLLBmsII/view?usp=sharing)
